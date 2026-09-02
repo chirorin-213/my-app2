@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>案件金額計算ツール</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PWA用メタタグ -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="案件計算">
+    <meta name="theme-color" content="#4f46e5">
+
+    <!-- Web App Manifest (動的生成) -->
+    <script>
+        const manifest = {
+            "name": "案件別金額計算ツール",
+            "short_name": "案件計算",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#f8fafc",
+            "theme_color": "#4f46e5",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%234f46e5'%3E%3Cpath d='M64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zM96 128h320c17.7 0 32 14.3 32 32s-14.3 32-32 32H96c-17.7 0-32-14.3-32-32s14.3-32 32-32zm0 96h96c17.7 0 32 14.3 32 32s-14.3 32-32 32H96c-17.7 0-32-14.3-32-32s14.3-32 32-32zm160 0h160c17.7 0 32 14.3 32 32s-14.3 32-32 32H256c-17.7 0-32-14.3-32-32s14.3-32 32-32zm-160 96h160c17.7 0 32 14.3 32 32s-14.3 32-32 32H96c-17.7 0-32-14.3-32-32s14.3-32 32-32zm192 32c0-17.7 14.3-32 32-32h64c17.7 0 32 14.3 32 32s-14.3 32-32 32H320c-17.7 0-32-14.3-32-32z'/%3E%3C/svg%3E",
+                    "sizes": "512x512",
+                    "type": "image/svg+xml"
+                }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestURL;
+        document.head.appendChild(link);
+    </script>
+
+    <style>
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            body {
+                background-color: white !important;
+                color: black !important;
+            }
+            .shadow-lg, .shadow-md, .shadow {
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans select-none">
+
+    <!-- ヘッダー -->
+    <header class="bg-indigo-600 text-white shadow-md no-print pt-safe">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-2">
+            <h1 class="text-xl md:text-2xl font-bold flex items-center gap-2">
+                <i class="fa-solid font-bold fa-calculator"></i>
+                <span>案件別金額計算ツール</span>
+            </h1>
+            <div class="flex items-center gap-2 text-xs md:text-sm bg-indigo-700/60 px-3 py-1.5 rounded-lg border border-indigo-500/30">
+                <i class="fa-solid fa-circle-info text-indigo-200"></i>
+                <span>自動リアルタイム計算</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-5xl mx-auto px-4 py-6 flex-grow w-full">
+
+        <!-- 設定パネル（税率など） -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 no-print">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-2 font-semibold text-slate-700">
+                    <i class="fa-solid fa-sliders text-indigo-600"></i>
+                    <span>計算設定</span>
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-4 text-sm">
+                    <!-- 消費税区分 -->
+                    <div class="flex items-center gap-2">
+                        <label for="tax-type" class="text-slate-600 font-medium">税区分:</label>
+                        <select id="tax-type" onchange="calculateTotal()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="exclusive" selected>外税（税別）</option>
+                            <option value="inclusive">内税（税込）</option>
+                            <option value="none">非課税</option>
+                        </select>
+                    </div>
+
+                    <!-- 税率 -->
+                    <div id="tax-rate-container" class="flex items-center gap-2">
+                        <label for="tax-rate" class="text-slate-600 font-medium">税率:</label>
+                        <select id="tax-rate" onchange="calculateTotal()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="0.10" selected>10% (標準)</option>
+                            <option value="0.08">8% (軽減税率)</option>
+                        </select>
+                    </div>
+
+                    <!-- 端数処理 -->
+                    <div class="flex items-center gap-2">
+                        <label for="rounding" class="text-slate-600 font-medium">端数処理:</label>
+                        <select id="rounding" onchange="calculateTotal()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="floor" selected>切り捨て</option>
+                            <option value="round">四捨五入</option>
+                            <option value="ceil">切り上げ</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 印刷用ヘッダー情報（通常は非表示） -->
+        <div class="hidden print-only mb-6">
+            <h1 class="text-2xl font-bold text-center mb-2">作業金額計算書</h1>
+            <p class="text-right text-sm text-slate-500">作成日: <span id="print-date"></span></p>
+        </div>
+
+        <!-- 案件テーブル（PC向け・大画面） -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6 hidden md:block">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-100 text-slate-700 text-sm font-semibold border-b border-slate-200">
+                        <th class="py-3 px-4 w-12 text-center">#</th>
+                        <th class="py-3 px-4">案件名 / 作業内容</th>
+                        <th class="py-3 px-4 w-44">単価 (円)</th>
+                        <th class="py-3 px-4 w-36">作業時間 (h)</th>
+                        <th class="py-3 px-4 w-44 text-right">小計 (円)</th>
+                        <th class="py-3 px-4 w-16 text-center no-print">削除</th>
+                    </tr>
+                </thead>
+                <tbody id="item-table-body" class="divide-y divide-slate-200">
+                    <!-- 行データはJavaScriptで動的生成 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 案件カードリスト（スマホ向け・小画面） -->
+        <div id="item-card-container" class="space-y-4 mb-6 md:hidden">
+            <!-- カードデータはJavaScriptで動的生成 -->
+        </div>
+
+        <!-- アクションボタンエリア -->
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-8 no-print">
+            <button onclick="addNewRow()" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i>
+                <span>案件を追加</span>
+            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="clearAllRows()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium px-3 py-2 rounded-lg transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>全クリア</span>
+                </button>
+                <button onclick="exportCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-csv"></i>
+                    <span>CSV出力</span>
+                </button>
+                <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium px-3 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-print"></i>
+                    <span>印刷 / PDF</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 合計集計パネル -->
+        <div class="bg-white rounded-xl shadow-md border border-indigo-100 p-6 mb-12">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <!-- 左側: 内訳サマリー -->
+                <div class="space-y-2 text-slate-600 border-b md:border-b-0 md:border-r border-slate-200 pb-4 md:pb-0 md:pr-6">
+                    <div class="flex justify-between items-center text-sm">
+                        <span>合計作業時間:</span>
+                        <span id="total-hours" class="font-semibold text-slate-800">0 時間</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span>小計 (税抜/本体金額):</span>
+                        <span id="subtotal-amount" class="font-semibold text-slate-800">¥0</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span id="tax-label">消費税 (10%):</span>
+                        <span id="tax-amount" class="font-semibold text-slate-800">¥0</span>
+                    </div>
+                </div>
+
+                <!-- 右側: 総合計金額 -->
+                <div class="flex flex-col items-center md:items-end justify-center">
+                    <span class="text-sm font-semibold text-indigo-600 mb-1">合計請求金額（税込）</span>
+                    <div class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+                        <span id="total-amount" class="text-indigo-600">¥0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="bg-slate-100 border-t border-slate-200 py-4 text-center text-xs text-slate-500 no-print">
+        <p>案件別金額計算ツール (GitHub Pages対応) &copy; 全自動リアルタイム計算</p>
+    </footer>
+
+    <!-- JS処理 -->
+    <script>
+        const STORAGE_KEY = 'anken_calculator_items_v2';
+
+        let items = loadItems();
+        let nextId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+
+        function loadItems() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch(e) {
+                    console.error(e);
+                }
+            }
+            return [
+                { id: 1, name: 'Webサイトデザイン制作', price: 3500, hours: 20 },
+                { id: 2, name: 'フロントエンド実装作業', price: 4000, hours: 15 },
+                { id: 3, name: '打ち合わせ・要件定義', price: 3000, hours: 3 }
+            ];
+        }
+
+        function saveItems() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            document.getElementById('print-date').innerText = today;
+            renderItems();
+        });
+
+        function renderItems() {
+            const tbody = document.getElementById('item-table-body');
+            const cardContainer = document.getElementById('item-card-container');
+
+            tbody.innerHTML = '';
+            cardContainer.innerHTML = '';
+
+            if (items.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="py-8 text-center text-slate-400">
+                            <i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>
+                            案件が登録されていません。「案件を追加」ボタンを押してください。
+                        </td>
+                    </tr>`;
+                
+                cardContainer.innerHTML = `
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 text-center text-slate-400">
+                        <i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>
+                        案件が登録されていません。「案件を追加」ボタンを押してください。
+                    </div>`;
+            } else {
+                items.forEach((item, index) => {
+                    const subtotal = (item.price || 0) * (item.hours || 0);
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/80 transition-colors";
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 text-center font-medium text-slate-400">${index + 1}</td>
+                        <td class="py-3 px-4">
+                            <input type="text" value="${escapeHtml(item.name)}" 
+                                oninput="updateItem(${item.id}, 'name', this.value)" 
+                                placeholder="案件名を入力"
+                                class="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white rounded px-2 py-1 text-slate-800 transition focus:outline-none">
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="relative flex items-center">
+                                <span class="absolute left-2 text-slate-400 text-sm">¥</span>
+                                <input type="number" value="${item.price}" min="0" step="100"
+                                    oninput="updateItem(${item.id}, 'price', this.value)" 
+                                    placeholder="0"
+                                    class="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white rounded pl-6 pr-2 py-1 text-slate-800 transition focus:outline-none">
+                            </div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <input type="number" value="${item.hours}" min="0" step="0.25"
+                                oninput="updateItem(${item.id}, 'hours', this.value)" 
+                                placeholder="0"
+                                class="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white rounded px-2 py-1 text-slate-800 transition focus:outline-none">
+                        </td>
+                        <td class="py-3 px-4 text-right font-semibold text-slate-700">
+                            ¥${formatNumber(subtotal)}
+                        </td>
+                        <td class="py-3 px-4 text-center no-print">
+                            <button onclick="removeItem(${item.id})" class="text-slate-400 hover:text-rose-500 p-1 transition" title="削除">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3";
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start gap-2">
+                            <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">#${index + 1}</span>
+                            <button onclick="removeItem(${item.id})" class="text-slate-400 hover:text-rose-500 p-1 no-print" title="削除">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">案件名 / 作業内容</label>
+                            <input type="text" value="${escapeHtml(item.name)}" 
+                                oninput="updateItem(${item.id}, 'name', this.value)" 
+                                placeholder="案件名を入力"
+                                class="w-full border border-slate-200 focus:border-indigo-500 rounded px-3 py-1.5 text-sm text-slate-800 focus:outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-slate-500 mb-1">単価 (円)</label>
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-2.5 text-slate-400 text-xs">¥</span>
+                                    <input type="number" value="${item.price}" min="0" step="100"
+                                        oninput="updateItem(${item.id}, 'price', this.value)" 
+                                        placeholder="0"
+                                        class="w-full border border-slate-200 focus:border-indigo-500 rounded pl-6 pr-2 py-1.5 text-sm text-slate-800 focus:outline-none">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-500 mb-1">作業時間 (h)</label>
+                                <input type="number" value="${item.hours}" min="0" step="0.25"
+                                    oninput="updateItem(${item.id}, 'hours', this.value)" 
+                                    placeholder="0"
+                                    class="w-full border border-slate-200 focus:border-indigo-500 rounded px-3 py-1.5 text-sm text-slate-800 focus:outline-none">
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-slate-100 flex justify-between items-center">
+                            <span class="text-xs text-slate-500">小計</span>
+                            <span class="font-bold text-slate-800">¥${formatNumber(subtotal)}</span>
+                        </div>
+                    `;
+                    cardContainer.appendChild(card);
+                });
+            }
+
+            calculateTotal();
+        }
+
+        function addNewRow() {
+            items.push({
+                id: nextId++,
+                name: '',
+                price: 0,
+                hours: 0
+            });
+            saveItems();
+            renderItems();
+        }
+
+        function removeItem(id) {
+            items = items.filter(item => item.id !== id);
+            saveItems();
+            renderItems();
+        }
+
+        function clearAllRows() {
+            if (items.length === 0) return;
+            if (confirm('すべての案件データを消去しますか？')) {
+                items = [];
+                saveItems();
+                renderItems();
+            }
+        }
+
+        function updateItem(id, field, value) {
+            const item = items.find(i => i.id === id);
+            if (!item) return;
+
+            if (field === 'name') {
+                item.name = value;
+            } else if (field === 'price') {
+                item.price = parseFloat(value) || 0;
+            } else if (field === 'hours') {
+                item.hours = parseFloat(value) || 0;
+            }
+
+            saveItems();
+            calculateTotal();
+            updateSubtotalDisplays();
+        }
+
+        function updateSubtotalDisplays() {
+            const tbody = document.getElementById('item-table-body');
+            const rows = tbody.querySelectorAll('tr');
+            
+            items.forEach((item, index) => {
+                const subtotal = (item.price || 0) * (item.hours || 0);
+                
+                if (rows[index] && rows[index].children[4]) {
+                    rows[index].children[4].innerText = `¥${formatNumber(subtotal)}`;
+                }
+
+                const cardContainer = document.getElementById('item-card-container');
+                const cards = cardContainer.children;
+                if (cards[index]) {
+                    const subtotalSpan = cards[index].querySelector('.border-t span:last-child');
+                    if (subtotalSpan) {
+                        subtotalSpan.innerText = `¥${formatNumber(subtotal)}`;
+                    }
+                }
+            });
+        }
+
+        function calculateTotal() {
+            const taxType = document.getElementById('tax-type').value;
+            const taxRate = parseFloat(document.getElementById('tax-rate').value);
+            const rounding = document.getElementById('rounding').value;
+            const taxRateContainer = document.getElementById('tax-rate-container');
+
+            if (taxType === 'none') {
+                taxRateContainer.classList.add('opacity-40', 'pointer-events-none');
+            } else {
+                taxRateContainer.classList.remove('opacity-40', 'pointer-events-none');
+            }
+
+            const totalHours = items.reduce((sum, item) => sum + (item.hours || 0), 0);
+            const rawSubtotal = items.reduce((sum, item) => sum + ((item.price || 0) * (item.hours || 0)), 0);
+
+            let subtotal = 0;
+            let taxAmount = 0;
+            let totalAmount = 0;
+
+            if (taxType === 'exclusive') {
+                subtotal = rawSubtotal;
+                const rawTax = subtotal * taxRate;
+                taxAmount = applyRounding(rawTax, rounding);
+                totalAmount = subtotal + taxAmount;
+                document.getElementById('tax-label').innerText = `消費税 (${taxRate * 100}%):`;
+            } else if (taxType === 'inclusive') {
+                totalAmount = rawSubtotal;
+                const rawTax = totalAmount - (totalAmount / (1 + taxRate));
+                taxAmount = applyRounding(rawTax, rounding);
+                subtotal = totalAmount - taxAmount;
+                document.getElementById('tax-label').innerText = `うち消費税 (${taxRate * 100}%):`;
+            } else {
+                subtotal = rawSubtotal;
+                taxAmount = 0;
+                totalAmount = subtotal;
+                document.getElementById('tax-label').innerText = '消費税 (対象外):';
+            }
+
+            document.getElementById('total-hours').innerText = `${formatNumber(totalHours, true)} 時間`;
+            document.getElementById('subtotal-amount').innerText = `¥${formatNumber(subtotal)}`;
+            document.getElementById('tax-amount').innerText = `¥${formatNumber(taxAmount)}`;
+            document.getElementById('total-amount').innerText = `¥${formatNumber(totalAmount)}`;
+        }
+
+        function applyRounding(value, type) {
+            if (type === 'floor') {
+                return Math.floor(value);
+            } else if (type === 'ceil') {
+                return Math.ceil(value);
+            } else {
+                return Math.round(value);
+            }
+        }
+
+        function formatNumber(num, isDecimal = false) {
+            if (isNaN(num)) return '0';
+            if (isDecimal) {
+                return Number(Math.round(num + 'e2') + 'e-2').toLocaleString('ja-JP');
+            }
+            return Math.floor(num).toLocaleString('ja-JP');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function exportCSV() {
+            if (items.length === 0) {
+                alert('出力するデータがありません。');
+                return;
+            }
+
+            let csvContent = "\uFEFF";
+            csvContent += "No,案件名,単価(円),作業時間(時間),小計(円)\n";
+
+            items.forEach((item, index) => {
+                const subtotal = (item.price || 0) * (item.hours || 0);
+                const name = `"${(item.name || '').replace(/"/g, '""')}"`;
+                csvContent += `${index + 1},${name},${item.price || 0},${item.hours || 0},${subtotal}\n`;
+            });
+
+            const totalHours = items.reduce((sum, item) => sum + (item.hours || 0), 0);
+            const totalAmountText = document.getElementById('total-amount').innerText.replace('¥', '').replace(/,/g, '');
+            const subtotalText = document.getElementById('subtotal-amount').innerText.replace('¥', '').replace(/,/g, '');
+            const taxText = document.getElementById('tax-amount').innerText.replace('¥', '').replace(/,/g, '');
+
+            csvContent += `\n,,,合計作業時間,${totalHours}\n`;
+            csvContent += `,,,小計,${subtotalText}\n`;
+            csvContent += `,,,消費税,${taxText}\n`;
+            csvContent += `,,,総合計金額,${totalAmountText}\n`;
+
+            const blobData = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const linkTag = document.createElement("a");
+            const url = URL.createObjectURL(blobData);
+            
+            const today = new Date().toISOString().slice(0, 10);
+            linkTag.setAttribute("href", url);
+            linkTag.setAttribute("download", `案件金額計算_${today}.csv`);
+            document.body.appendChild(linkTag);
+            linkTag.click();
+            document.body.removeChild(linkTag);
+        }
+    </script>
+</body>
+</html>
